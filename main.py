@@ -27,10 +27,6 @@ async def callback(request: web.Request):
     return web.Response(status=200)
 
 
-async def hello(_):
-    return web.Response(body="Hello!")
-
-
 @bot.command()
 async def ping(ctx: commands.Context, *, _: str = None):
     return await ctx.send(f'Pong! `{bot.latency}`')
@@ -40,6 +36,7 @@ async def ping(ctx: commands.Context, *, _: str = None):
 @commands.is_owner()
 async def restart(ctx: commands.Context, *, _: str = None):
     await ctx.send(f'Shutting down server & Polympics client...')
+    await server.shutdown()
     await server.cleanup()
     await polympics_client.close()
     await ctx.send(f'Complete. Shutting down bot.')
@@ -58,7 +55,6 @@ async def on_ready():
     server.add_routes(
         [
             web.post("/callback/account_team_update", callback),
-            web.get("/", hello)
         ],
     )
     
