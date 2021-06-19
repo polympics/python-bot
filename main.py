@@ -34,7 +34,7 @@ async def on_ready():
     
     # Add the routes for the server
     server.add_routes(
-        [web.post("/", callback)]
+        [web.post("/callback/account_team_update", callback)]
     )
     # Create an AppRunner
     runner = web.AppRunner(server)
