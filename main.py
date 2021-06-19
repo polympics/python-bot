@@ -1,16 +1,8 @@
-import faulthandler
 import discord
 import polympics
 from aiohttp import web
-import os
 
 import config
-
-
-faulthandler.enable(
-    os.path.dirname(__file__) + "/faults.log",
-    all_threads=True
-)
 
 
 client = discord.Client()
