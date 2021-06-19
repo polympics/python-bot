@@ -1,25 +1,28 @@
 import logging
 
 import discord
+from discord.ext import commands
 import polympics
 from aiohttp import web
 
 import config
 
 
-client = discord.Client()
+bot = commands.Bot(
+    'p!'
+)
+bot.check(
+    commands.guild_only()
+)
+
 server = web.Application()
 polympics_client: [polympics.AppClient, None] = None
 
 
 async def callback(request: web.Request):
-    print(request.headers)
-    print(await request.json())
+    json_data = await request.json()
     
-    channel: discord.TextChannel = client.get_channel(826576885831434321)
-    await channel.send(
-        f'HEADERS:\n\n{request.headers}\n\nDATA:\n\n{await request.json()}'
-    )
+    print(type(json_data))
     
     return web.Response(status=200)
 
@@ -28,7 +31,12 @@ async def hello(_):
     return web.Response(body="Hello!")
 
 
-@client.event
+@bot.command()
+async def ping(ctx: commands.Context, *, _: str = None):
+    return await ctx.send(f'Pong! `{bot.latency}`')
+
+
+@bot.event
 async def on_ready():
     global polympics_client
     
@@ -51,7 +59,7 @@ async def on_ready():
         ],
     )
     
-    logging.basicConfig(level=logging.DEBUG)
+    # logging.basicConfig(level=logging.DEBUG)
     
     # Create an AppRunner
     runner = web.AppRunner(server)
@@ -64,4 +72,4 @@ async def on_ready():
 
 
 if __name__ == '__main__':
-    client.run(config.discord_token)
+    bot.run(config.discord_token)
