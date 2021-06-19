@@ -22,6 +22,10 @@ async def callback(request: web.Request):
     return web.Response(status=200)
 
 
+async def hello(_):
+    return web.Response(body="Hello!")
+
+
 @client.event
 async def on_ready():
     global polympics_client
@@ -39,7 +43,10 @@ async def on_ready():
     
     # Add the routes for the server
     server.add_routes(
-        [web.post("/callback/account_team_update", callback)]
+        [
+            web.post("/callback/account_team_update", callback),
+            web.get("/", hello)
+        ],
     )
     # Create an AppRunner
     runner = web.AppRunner(server)
