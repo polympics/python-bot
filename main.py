@@ -1,3 +1,5 @@
+import logging
+
 import discord
 import polympics
 from aiohttp import web
@@ -48,6 +50,9 @@ async def on_ready():
             web.get("/", hello)
         ],
     )
+    
+    logging.basicConfig(level=logging.DEBUG)
+    
     # Create an AppRunner
     runner = web.AppRunner(server)
     # Set it up
