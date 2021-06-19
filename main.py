@@ -1,11 +1,17 @@
-import asyncio
-import sys
-
+import faulthandler
 import discord
 import polympics
 from aiohttp import web
+import os
 
 import config
+
+
+faulthandler.enable(
+    os.path.dirname(__file__) + "/faults.log",
+    all_threads=True
+)
+
 
 client = discord.Client()
 server = web.Application()
@@ -49,6 +55,4 @@ async def on_ready():
 
 
 if __name__ == '__main__':
-    print(config.secret)
-    
     client.run(config.discord_token)
