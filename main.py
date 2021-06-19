@@ -1,12 +1,9 @@
-import logging
-
-import discord
-from discord.ext import commands
 import polympics
+import sys
 from aiohttp import web
+from discord.ext import commands
 
 import config
-
 
 bot = commands.Bot(
     'p!'
@@ -16,7 +13,10 @@ bot.check(
 )
 
 server = web.Application()
-polympics_client: [polympics.AppClient, None] = None
+polympics_client = polympics.AppClient(
+    polympics.Credentials(config.api_user, config.api_token),
+    base_url=config.base_url
+)
 
 
 async def callback(request: web.Request):
@@ -36,15 +36,18 @@ async def ping(ctx: commands.Context, *, _: str = None):
     return await ctx.send(f'Pong! `{bot.latency}`')
 
 
+@bot.command()
+@commands.is_owner()
+async def restart(ctx: commands.Context, *, _: str = None):
+    await ctx.send(f'Shutting down server & Polympics client...')
+    await server.cleanup()
+    await polympics_client.close()
+    await ctx.send(f'Complete. Shutting down bot.')
+    sys.exit(0)
+
+
 @bot.event
 async def on_ready():
-    global polympics_client
-    
-    polympics_client = polympics.AppClient(
-        polympics.Credentials(config.api_user, config.api_token),
-        base_url=config.base_url
-    )
-    
     await polympics_client.create_callback(
         polympics.EventType.ACCOUNT_TEAM_UPDATE,
         config.callback_url,
