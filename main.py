@@ -16,7 +16,7 @@ async def callback(request: web.Request):
     print(request.headers)
     print(await request.json())
     
-    channel: discord.TextChannel = await client.get_channel(826576885831434321)
+    channel: discord.TextChannel = client.get_channel(826576885831434321)
     await channel.send(
         f'HEADERS:\n\n{request.headers}\n\nDATA:\n\n{await request.json()}'
     )
