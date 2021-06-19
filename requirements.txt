@@ -1,0 +1,4 @@
+discord.py
+
+pip~=20.1
+setuptools~=40.8.0
