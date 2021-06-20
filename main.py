@@ -94,7 +94,7 @@ async def callback(request: web.Request):
         )
     else:
         print("Creating channel")
-        role, channel = create_team_on_discord(team, guild)
+        role, channel = await create_team_on_discord(team, guild)
         await member.add_roles(role)
     
     return web.Response(status=200)
