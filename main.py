@@ -92,7 +92,7 @@ async def callback(request: web.Request):
         print("Team is None")
         # They've left whichever team they were on. Remove all team roles.
         await member.remove_roles(
-            filter(lambda x: x.name.startswith('Team:'), guild.roles)
+            *filter(lambda x: x.name.startswith('Team:'), guild.roles)
         )
     else:
         print("Creating channel")
