@@ -43,10 +43,16 @@ async def create_team_on_discord(team: polympics.Team, guild: discord.Guild) -> 
     no_emoji_name = team.name.encode('ascii', 'ignore').decode('ascii').strip()
     
     chan_name = channel_name(no_emoji_name)
-    role = discord.utils.get(guild.roles, name=f'Team: {no_emoji_name}') or await guild.create_role(
-        reason='Create Team role because it didn\'t exist',
-        name=f"Team: {no_emoji_name}"
-    )
+    role = discord.utils.get(guild.roles, name=f'Team: {no_emoji_name}')
+    if role is None:
+        role = await guild.create_role(
+            reason='Create Team role because it didn\'t exist',
+            name=f"Team: {no_emoji_name}"
+        )
+        c: discord.TextChannel = guild.get_channel(846777537799651388)
+        await c.set_permissions(
+            role, overwrite=discord.PermissionOverwrite(read_messages=True)
+        )
     
     if chan := discord.utils.get(team_category.channels, name=chan_name):
         channel = chan
@@ -70,7 +76,6 @@ async def callback(request: web.Request):
     
     # Load the polympics server
     guild: discord.Guild = bot.get_guild(814317488418193478)
-    print('Guild Loaded')
     
     # Load the data sent via the callback
     data: dict = await request.json()
@@ -91,7 +96,6 @@ async def callback(request: web.Request):
             *filter(lambda x: x.name.startswith('Team:'), guild.roles)
         )
     else:
-        print("Creating channel")
         role, channel = await create_team_on_discord(team, guild)
         await member.add_roles(role)
     
