@@ -43,15 +43,15 @@ async def create_team_on_discord(team: polympics.Team, guild: discord.Guild) -> 
     no_emoji_name = team.name.encode('ascii', 'ignore').decode('ascii').strip()
     
     chan_name = channel_name(team.name)
-    role = discord.utils.get(guild.roles, name=no_emoji_name) or await guild.create_role(
+    role = discord.utils.get(guild.roles, name=f'Team: {no_emoji_name}') or await guild.create_role(
         reason='Create Team role because it didn\'t exist',
-        name=no_emoji_name
+        name=f"Team: {no_emoji_name}"
     )
     
     if chan := discord.utils.get(team_category.channels, name=chan_name):
         channel = chan
     else:
-        channel = team_category.create_text_channel(
+        channel = await team_category.create_text_channel(
             chan_name, reason='Create Team channel because it didn\'t exist',
             overwrites={
                 role: discord.PermissionOverwrite(read_messages=True),
@@ -82,12 +82,10 @@ async def callback(request: web.Request):
     # is the member in the server?
     member: discord.Member = guild.get_member(account.id)
     if member is None:
-        print('Member doesn\'t exist')
         # If not, return
         return
-    print("member exists")
+    
     if team is None:
-        print("Team is None")
         # They've left whichever team they were on. Remove all team roles.
         await member.remove_roles(
             *filter(lambda x: x.name.startswith('Team:'), guild.roles)
