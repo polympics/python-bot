@@ -73,7 +73,7 @@ async def callback(request: web.Request):
     print('Guild Loaded')
     
     # Load the data sent via the callback
-    data: dict = json.loads(await request.json())
+    data: dict = await request.json()
     print('Data loaded:', data)
     
     # Load the account and team from the data
