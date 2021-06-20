@@ -42,7 +42,7 @@ async def create_team_on_discord(team: polympics.Team, guild: discord.Guild) -> 
     # Strip non-ascii characters
     no_emoji_name = team.name.encode('ascii', 'ignore').decode('ascii').strip()
     
-    chan_name = channel_name(team.name)
+    chan_name = channel_name(no_emoji_name)
     role = discord.utils.get(guild.roles, name=f'Team: {no_emoji_name}') or await guild.create_role(
         reason='Create Team role because it didn\'t exist',
         name=f"Team: {no_emoji_name}"
