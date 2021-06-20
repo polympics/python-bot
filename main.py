@@ -90,12 +90,12 @@ async def callback(request: web.Request):
         # If not, return
         return
     
-    if team is None:
-        # They've left whichever team they were on. Remove all team roles.
-        await member.remove_roles(
-            *filter(lambda x: x.name.startswith('Team:'), guild.roles)
-        )
-    else:
+    # Remove any current team roles
+    await member.remove_roles(
+        *filter(lambda x: x.name.startswith('Team:'), guild.roles)
+    )
+    if team is not None:
+        # Add new team roles if they're being added to a team
         role, channel = await create_team_on_discord(team, guild)
         await member.add_roles(role)
     
