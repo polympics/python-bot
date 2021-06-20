@@ -74,12 +74,10 @@ async def callback(request: web.Request):
     
     # Load the data sent via the callback
     data: dict = await request.json()
-    print('Data loaded:', data)
     
     # Load the account and team from the data
     account: polympics.Account = polympics.Account.from_dict(d) if (d := data['account']) is not None else None
     team: polympics.Team = polympics.Team.from_dict(d) if (d := data['team']) is not None else None
-    print(account, team)
     
     # is the member in the server?
     member: discord.Member = guild.get_member(account.id)
