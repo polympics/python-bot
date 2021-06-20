@@ -69,26 +69,32 @@ async def callback(request: web.Request):
     
     # Load the polympics server
     guild: discord.Guild = bot.get_guild(814317488418193478)
+    print('Guild Loaded')
     
     # Load the data sent via the callback
     data: dict = json.loads(await request.json())
+    print('Data loaded:', data)
     
     # Load the account and team from the data
     account: polympics.Account = polympics.Account.from_dict(d) if (d := data['account']) is not None else None
     team: polympics.Team = polympics.Team.from_dict(d) if (d := data['team']) is not None else None
+    print(account, team)
     
     # is the member in the server?
     member: discord.Member = guild.get_member(account.id)
     if member is None:
+        print('Member doesn\'t exist')
         # If not, return
         return
-    
+    print("member exists")
     if team is None:
+        print("Team is None")
         # They've left whichever team they were on. Remove all team roles.
         await member.remove_roles(
             filter(lambda x: x.name.startswith('Team:'), guild.roles)
         )
     else:
+        print("Creating channel")
         role, channel = create_team_on_discord(team, guild)
         await member.add_roles(role)
     
