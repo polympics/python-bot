@@ -65,6 +65,7 @@ async def create_team_on_discord(team: polympics.Team, guild: discord.Guild) -> 
 async def callback(request: web.Request):
     # Verify it game from the polympics server
     if request.headers['Authorization'] != config.secret:
+        print(f'Authorization doesn\'t match: {request.headers["Authorization"]} != {config.secret}')
         return web.Response(status=403)
     
     # Load the polympics server
