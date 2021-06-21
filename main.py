@@ -62,6 +62,7 @@ async def create_team_on_discord(team: polympics.Team, guild: discord.Guild) -> 
             overwrites={
                 role: discord.PermissionOverwrite(read_messages=True),
                 guild.default_role: discord.PermissionOverwrite(read_messages=False),
+                guild.get_role(856036892801630228): discord.PermissionOverwrite(send_messages=False, add_reactions=False)
             }
         )
         
