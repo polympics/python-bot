@@ -117,6 +117,21 @@ async def restart(ctx: commands.Context, *, _: str = None):
     await polympics_client.close()
     await ctx.send(f'Complete. Shutting down bot.')
     sys.exit(0)
+    
+
+@bot.event
+async def on_user_update(before: discord.User, after: discord.User):
+    if (account := await polympics_client.get_account(before.id)) is not None:
+        
+        if before.avatar != after.avatar:
+            ext = 'gif' if after.is_avatar_animated() else 'png'
+            avatar_url = f'cdn.discordapp.com/avatars/{account.id}/{after.avatar}.{ext}'
+        else:
+            avatar_url = account.avatar_url
+            
+        await polympics_client.update_account(
+            account, name=after.name, discriminator=after.discriminator, avatar_url=avatar_url
+        )
 
 
 @bot.event
