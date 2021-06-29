@@ -197,6 +197,28 @@ async def on_user_update(before: discord.User, after: discord.User):
         await polympics_client.update_account(
             account, name=after.name, discriminator=after.discriminator, avatar_url=avatar_url
         )
+        
+
+@bot.event
+async def on_member_join(member: discord.Member):
+    try:
+        account = await polympics_client.get_account(member.id)
+    except Exception:
+        return
+    else:
+        if account is None:
+            return
+    
+    if account.team is not None:
+        guild = bot.get_guild(814317488418193478)
+        
+        role = await create_team_on_discord(account.team, guild)
+        await member.remove_roles(
+            *filter(lambda x: x.name.startswith('Team:'), guild.roles)
+        )
+        await member.add_roles(
+            role
+        )
 
 
 @bot.event
