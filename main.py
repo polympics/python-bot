@@ -1,7 +1,13 @@
+# --------------------------------------------------------------------------------------------- #
+# Copyright (c) 2021 Jasper Harrison. This file is licensed under the terms of the MIT License. #
+# Please see the LICENSE file in the root of this repository for more details.                  #
+# --------------------------------------------------------------------------------------------- #
 import discord
 import json
+import pathlib
 import polympics
 import sys
+from asyncio import Lock
 from aiohttp import web
 from discord.ext import commands
 
@@ -20,6 +26,22 @@ bot.check(
     )
 )
 
+DATA_PATH = pathlib.Path(__file__).parent.joinpath("data.json")
+DATA_LOCK = Lock()
+DATA = {}
+
+
+async def store(key, value):
+    async with DATA_LOCK.acquire():
+        DATA[key] = value
+        json.dump(DATA, DATA_PATH.open())
+
+
+async def get(key, default=None):
+    async with DATA_LOCK.acquire():
+        return DATA.get(key, default)
+
+
 server = web.Application()
 polympics_client = polympics.AppClient(
     polympics.Credentials(config.api_user, config.api_token),
@@ -27,8 +49,8 @@ polympics_client = polympics.AppClient(
 )
 
 
-def channel_name(name: str) -> str:
-    return name.replace(' ', '-').lower()
+def strip_special(text):
+    return text.encode('ascii', 'ignore').decode('ascii').strip()
 
 
 async def create_team_on_discord(team: polympics.Team, guild: discord.Guild) -> (discord.Role, discord.TextChannel):
@@ -40,11 +62,12 @@ async def create_team_on_discord(team: polympics.Team, guild: discord.Guild) -> 
     team_category: discord.CategoryChannel = discord.utils.get(guild.categories, id=846777453640024076)
     
     # Strip non-ascii characters
-    no_emoji_name = team.name.encode('ascii', 'ignore').decode('ascii').strip()
+    no_emoji_name = strip_special(team.name)
+    chan_name = no_emoji_name.replace(' ', '-').lower()
     
-    chan_name = channel_name(no_emoji_name)
-    role = discord.utils.get(guild.roles, name=f'Team: {no_emoji_name}')
-    if role is None:
+    team_data = await get(no_emoji_name, None)
+    
+    if team_data is None:
         role = await guild.create_role(
             reason='Create Team role because it didn\'t exist',
             name=f"Team: {no_emoji_name}"
@@ -54,21 +77,29 @@ async def create_team_on_discord(team: polympics.Team, guild: discord.Guild) -> 
         await c.set_permissions(
             role, overwrite=discord.PermissionOverwrite(read_messages=True)
         )
-    
-    if chan := discord.utils.get(team_category.channels, name=chan_name):
-        channel = chan
-    else:
+
         channel = await team_category.create_text_channel(
             chan_name, reason='Create Team channel because it didn\'t exist',
             overwrites={
                 role: discord.PermissionOverwrite(read_messages=True),
                 guild.default_role: discord.PermissionOverwrite(read_messages=False),
                 # Muted role
-                guild.get_role(856036892801630228): discord.PermissionOverwrite(send_messages=False, add_reactions=False)
+                guild.get_role(856036892801630228): discord.PermissionOverwrite(send_messages=False,
+                                                                                add_reactions=False)
             }
         )
         
-    return role, channel
+        team_data = {
+            'role': role.id,
+            'channel': channel.id
+        }
+        
+        await store(no_emoji_name, team_data)
+        
+    else:
+        role = guild.get_role(team_data['role'])
+        
+    return role
 
 
 async def callback(request: web.Request):
@@ -99,7 +130,7 @@ async def callback(request: web.Request):
     )
     if team is not None:
         # Add new team roles if they're being added to a team
-        role, channel = await create_team_on_discord(team, guild)
+        role = await create_team_on_discord(team, guild)
         await member.add_roles(role)
     
     return web.Response(status=200)
@@ -112,6 +143,34 @@ async def ping(ctx: commands.Context, *, _: str = None):
 
 @bot.command()
 @commands.is_owner()
+async def check(ctx: commands.Context):
+    
+    guild: discord.Guild = ctx.guild
+    
+    async with ctx.typing():
+    
+        async for member in guild.fetch_members(limit=None):
+            member: discord.Member
+            account = await polympics_client.get_account(member.id)
+            
+            if account is None:
+                await ctx.send(f'Member {member.display_name} not registered.')
+                continue
+            
+            if account.team is not None:
+                role = await create_team_on_discord(account.team, guild)
+                await member.remove_roles(
+                    *filter(lambda x: x.name.startswith('Team:'), guild.roles)
+                )
+                await member.add_roles(
+                    role
+                )
+                await ctx.send(f"Fixed team roles for {member.display_name} - now on {account.team.name}")
+        await ctx.send('Done')
+
+
+@bot.command()
+@commands.is_owner()
 async def restart(ctx: commands.Context, *, _: str = None):
     await ctx.send(f'Shutting down server & Polympics client...')
     await server.shutdown()
@@ -119,7 +178,7 @@ async def restart(ctx: commands.Context, *, _: str = None):
     await polympics_client.close()
     await ctx.send(f'Complete. Shutting down bot.')
     sys.exit(0)
-    
+
 
 @bot.event
 async def on_user_update(before: discord.User, after: discord.User):
@@ -130,7 +189,7 @@ async def on_user_update(before: discord.User, after: discord.User):
             avatar_url = f'https://cdn.discordapp.com/avatars/{account.id}/{after.avatar}.{ext}'
         else:
             avatar_url = account.avatar_url
-            
+        
         await polympics_client.update_account(
             account, name=after.name, discriminator=after.discriminator, avatar_url=avatar_url
         )
@@ -164,4 +223,6 @@ async def on_ready():
 
 
 if __name__ == '__main__':
+    DATA = json.loads(DATA_PATH.read_bytes())
+    
     bot.run(config.discord_token)
