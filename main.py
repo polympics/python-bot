@@ -127,7 +127,7 @@ async def on_user_update(before: discord.User, after: discord.User):
         
         if before.avatar != after.avatar:
             ext = 'gif' if after.is_avatar_animated() else 'png'
-            avatar_url = f'cdn.discordapp.com/avatars/{account.id}/{after.avatar}.{ext}'
+            avatar_url = f'https://cdn.discordapp.com/avatars/{account.id}/{after.avatar}.{ext}'
         else:
             avatar_url = account.avatar_url
             
