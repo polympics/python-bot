@@ -34,7 +34,7 @@ DATA = {}
 async def store(key, value):
     async with DATA_LOCK:
         DATA[key] = value
-        json.dump(DATA, DATA_PATH.open())
+        json.dump(DATA, DATA_PATH.open('w'))
 
 
 async def get(key, default=None):
