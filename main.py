@@ -151,7 +151,11 @@ async def check(ctx: commands.Context):
     
         async for member in guild.fetch_members(limit=None):
             member: discord.Member
-            account = await polympics_client.get_account(member.id)
+            try:
+                account = await polympics_client.get_account(member.id)
+            except Exception as e:
+                print('Error with member', member.display_name, e)
+                continue
             
             if account is None:
                 await ctx.send(f'Member {member.display_name} not registered.')
