@@ -32,13 +32,13 @@ DATA = {}
 
 
 async def store(key, value):
-    async with DATA_LOCK.acquire():
+    async with DATA_LOCK:
         DATA[key] = value
         json.dump(DATA, DATA_PATH.open())
 
 
 async def get(key, default=None):
-    async with DATA_LOCK.acquire():
+    async with DATA_LOCK:
         return DATA.get(key, default)
 
 
