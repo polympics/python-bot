@@ -15,7 +15,7 @@ bot.check(
 )
 bot.check(
     commands.check_any(
-        commands.has_any_role(('Staff', 'Mod', 'Director', 'Polympic Committee', 'Infrastructure')),
+        commands.has_any_role(('Staff', 'Mod', 'Polympic Committee', 'Infrastructure')),
         commands.is_owner(),
     )
 )
@@ -49,6 +49,7 @@ async def create_team_on_discord(team: polympics.Team, guild: discord.Guild) -> 
             reason='Create Team role because it didn\'t exist',
             name=f"Team: {no_emoji_name}"
         )
+        # team-spirit
         c: discord.TextChannel = guild.get_channel(846777537799651388)
         await c.set_permissions(
             role, overwrite=discord.PermissionOverwrite(read_messages=True)
@@ -62,6 +63,7 @@ async def create_team_on_discord(team: polympics.Team, guild: discord.Guild) -> 
             overwrites={
                 role: discord.PermissionOverwrite(read_messages=True),
                 guild.default_role: discord.PermissionOverwrite(read_messages=False),
+                # Muted role
                 guild.get_role(856036892801630228): discord.PermissionOverwrite(send_messages=False, add_reactions=False)
             }
         )
