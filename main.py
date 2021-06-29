@@ -58,15 +58,15 @@ async def create_team_on_discord(team: polympics.Team, guild: discord.Guild) -> 
     Create team role & Team Channel in Discord server if they don't exist already,
     return the discord Objects - role, channel
     """
-    
+
     team_category: discord.CategoryChannel = discord.utils.get(guild.categories, id=846777453640024076)
-    
+
     # Strip non-ascii characters
     no_emoji_name = strip_special(team.name)
     chan_name = no_emoji_name.replace(' ', '-').lower()
-    
+
     team_data = await get(no_emoji_name, None)
-    
+
     if team_data is None:
         role = await guild.create_role(
             reason='Create Team role because it didn\'t exist',
@@ -88,17 +88,17 @@ async def create_team_on_discord(team: polympics.Team, guild: discord.Guild) -> 
                                                                                 add_reactions=False)
             }
         )
-        
+
         team_data = {
             'role': role.id,
             'channel': channel.id
         }
-        
+
         await store(no_emoji_name, team_data)
-        
+
     else:
         role = guild.get_role(team_data['role'])
-        
+
     return role
 
 
@@ -107,23 +107,23 @@ async def callback(request: web.Request):
     if request.headers['Authorization'] != f'Bearer {config.secret}':
         print(f'Authorization doesn\'t match: {request.headers["Authorization"]} != {config.secret}')
         return web.Response(status=403)
-    
+
     # Load the polympics server
     guild: discord.Guild = bot.get_guild(814317488418193478)
-    
+
     # Load the data sent via the callback
     data: dict = await request.json()
-    
+
     # Load the account and team from the data
     account: polympics.Account = polympics.Account.from_dict(d) if (d := data['account']) is not None else None
     team: polympics.Team = polympics.Team.from_dict(d) if (d := data['team']) is not None else None
-    
+
     # is the member in the server?
     member: discord.Member = guild.get_member(account.id)
     if member is None:
         # If not, return
         return
-    
+
     # Remove any current team roles
     await member.remove_roles(
         *filter(lambda x: x.name.startswith('Team:'), guild.roles)
@@ -132,7 +132,7 @@ async def callback(request: web.Request):
         # Add new team roles if they're being added to a team
         role = await create_team_on_discord(team, guild)
         await member.add_roles(role)
-    
+
     return web.Response(status=200)
 
 
@@ -144,11 +144,11 @@ async def ping(ctx: commands.Context, *, _: str = None):
 @bot.command()
 @commands.is_owner()
 async def check(ctx: commands.Context):
-    
+
     guild: discord.Guild = ctx.guild
-    
+
     async with ctx.typing():
-    
+
         async for member in guild.fetch_members(limit=None):
             member: discord.Member
             try:
@@ -156,11 +156,11 @@ async def check(ctx: commands.Context):
             except Exception as e:
                 print('Error with member', member.display_name, e)
                 continue
-            
+
             if account is None:
                 await ctx.send(f'Member {member.display_name} not registered.')
                 continue
-            
+
             if account.team is not None:
                 role = await create_team_on_discord(account.team, guild)
                 await member.remove_roles(
@@ -187,17 +187,17 @@ async def restart(ctx: commands.Context, *, _: str = None):
 @bot.event
 async def on_user_update(before: discord.User, after: discord.User):
     if (account := await polympics_client.get_account(before.id)) is not None:
-        
+
         if before.avatar != after.avatar:
             ext = 'gif' if after.is_avatar_animated() else 'png'
             avatar_url = f'https://cdn.discordapp.com/avatars/{account.id}/{after.avatar}.{ext}'
         else:
             avatar_url = account.avatar_url
-        
+
         await polympics_client.update_account(
             account, name=after.name, discriminator=after.discriminator, avatar_url=avatar_url
         )
-        
+
 
 @bot.event
 async def on_member_join(member: discord.Member):
@@ -208,10 +208,10 @@ async def on_member_join(member: discord.Member):
     else:
         if account is None:
             return
-    
+
     if account.team is not None:
         guild = bot.get_guild(814317488418193478)
-        
+
         role = await create_team_on_discord(account.team, guild)
         await member.remove_roles(
             *filter(lambda x: x.name.startswith('Team:'), guild.roles)
@@ -228,16 +228,16 @@ async def on_ready():
         config.callback_url,
         config.secret
     )
-    
+
     # Add the routes for the server
     server.add_routes(
         [
             web.post("/callback/account_team_update", callback),
         ],
     )
-    
+
     # logging.basicConfig(level=logging.DEBUG)
-    
+
     # Create an AppRunner
     runner = web.AppRunner(server)
     # Set it up
@@ -250,5 +250,5 @@ async def on_ready():
 
 if __name__ == '__main__':
     DATA = json.loads(DATA_PATH.read_bytes())
-    
+
     bot.run(config.discord_token)
