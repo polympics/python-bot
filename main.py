@@ -1,43 +1,47 @@
-# --------------------------------------------------------------------------------------------- #
-# Copyright (c) 2021 Jasper Harrison. This file is licensed under the terms of the MIT License. #
-# Please see the LICENSE file in the root of this repository for more details.                  #
-# --------------------------------------------------------------------------------------------- #
-import discord
+# -------------------------------------------------------------------------- #
+# Copyright (c) 2021 Jasper Harrison. This file is licensed under the terms  #
+# of the MIT License. Please see the LICENSE file in the root of this        #
+# repository for more details.                                               #
+# -------------------------------------------------------------------------- #
 import json
 import pathlib
-import polympics
 import sys
 from asyncio import Lock
+from typing import Any, Optional
+
+import discord
+import polympics
 from aiohttp import web
 from discord.ext import commands
 
 import config
 
-bot = commands.Bot(
-    'p!', intents=discord.Intents.all()
-)
-bot.check(
-    commands.guild_only()
-)
-bot.check(
-    commands.check_any(
-        commands.has_any_role(('Staff', 'Mod', 'Polympic Committee', 'Infrastructure')),
-        commands.is_owner(),
-    )
-)
 
-DATA_PATH = pathlib.Path(__file__).parent.joinpath("data.json")
+ADMIN_ROLES = 'Staff', 'Mod', 'Polympic Committee', 'Infrastructure'
+TEAM_CATEGORY_ID = 846777453640024076
+TEAM_SPIRIT_ID = 846777537799651388
+MUTED_ROLE_ID = 856036892801630228
+GUILD_ID = 814317488418193478
+
+bot = commands.Bot('p!', intents=discord.Intents.all())
+bot.check(commands.guild_only())
+bot.check(commands.check_any(
+    commands.has_any_role(ADMIN_ROLES),
+    commands.is_owner()
+))
+
+DATA_PATH = pathlib.Path(__file__).parent / 'data.json'
 DATA_LOCK = Lock()
 DATA = {}
 
 
-async def store(key, value):
+async def store(key: str, value: Any):
     async with DATA_LOCK:
         DATA[key] = value
         json.dump(DATA, DATA_PATH.open('w'))
 
 
-async def get(key, default=None):
+async def get(key: str, default: Any = None) -> Any:
     async with DATA_LOCK:
         return DATA.get(key, default)
 
@@ -49,17 +53,19 @@ polympics_client = polympics.AppClient(
 )
 
 
-def strip_special(text):
+def strip_special(text: str) -> str:
     return text.encode('ascii', 'ignore').decode('ascii').strip()
 
 
-async def create_team_on_discord(team: polympics.Team, guild: discord.Guild) -> (discord.Role, discord.TextChannel):
-    """
-    Create team role & Team Channel in Discord server if they don't exist already,
-    return the discord Objects - role, channel
-    """
+async def create_team_on_discord(
+        team: polympics.Team, guild: discord.Guild) -> discord.Role:
+    """Ensure team role and channel exist in the server.
 
-    team_category: discord.CategoryChannel = discord.utils.get(guild.categories, id=846777453640024076)
+    Creates them if they don't exist already.
+    """
+    team_category: discord.CategoryChannel = guild.get_channel(
+        TEAM_CATEGORY_ID
+    )
 
     # Strip non-ascii characters
     no_emoji_name = strip_special(team.name)
@@ -72,8 +78,7 @@ async def create_team_on_discord(team: polympics.Team, guild: discord.Guild) -> 
             reason='Create Team role because it didn\'t exist',
             name=f"Team: {no_emoji_name}"
         )
-        # team-spirit
-        c: discord.TextChannel = guild.get_channel(846777537799651388)
+        c: discord.TextChannel = guild.get_channel(TEAM_SPIRIT_ID)
         await c.set_permissions(
             role, overwrite=discord.PermissionOverwrite(read_messages=True)
         )
@@ -82,10 +87,12 @@ async def create_team_on_discord(team: polympics.Team, guild: discord.Guild) -> 
             chan_name, reason='Create Team channel because it didn\'t exist',
             overwrites={
                 role: discord.PermissionOverwrite(read_messages=True),
-                guild.default_role: discord.PermissionOverwrite(read_messages=False),
-                # Muted role
-                guild.get_role(856036892801630228): discord.PermissionOverwrite(send_messages=False,
-                                                                                add_reactions=False)
+                guild.default_role: discord.PermissionOverwrite(
+                    read_messages=False
+                ),
+                guild.get_role(MUTED_ROLE_ID): discord.PermissionOverwrite(
+                    send_messages=False, add_reactions=False
+                )
             }
         )
 
@@ -102,10 +109,10 @@ async def create_team_on_discord(team: polympics.Team, guild: discord.Guild) -> 
     return role
 
 
-async def callback(request: web.Request):
-    # Verify it game from the polympics server
+async def callback(request: web.Request) -> Optional[web.Response]:
+    # Verify it came from the polympics server
     if request.headers['Authorization'] != f'Bearer {config.secret}':
-        print(f'Authorization doesn\'t match: {request.headers["Authorization"]} != {config.secret}')
+        print('Bad token, ignoring request.')
         return web.Response(status=403)
 
     # Load the polympics server
@@ -113,13 +120,10 @@ async def callback(request: web.Request):
 
     # Load the data sent via the callback
     data: dict = await request.json()
+    payload: polympics.AccountTeamUpdate = polympics.account_team_update(data)
 
-    # Load the account and team from the data
-    account: polympics.Account = polympics.Account.from_dict(d) if (d := data['account']) is not None else None
-    team: polympics.Team = polympics.Team.from_dict(d) if (d := data['team']) is not None else None
-
-    # is the member in the server?
-    member: discord.Member = guild.get_member(account.id)
+    # Is the member in the server?
+    member: discord.Member = guild.get_member(payload.account.id)
     if member is None:
         # If not, return
         return
@@ -128,9 +132,9 @@ async def callback(request: web.Request):
     await member.remove_roles(
         *filter(lambda x: x.name.startswith('Team:'), guild.roles)
     )
-    if team is not None:
+    if payload.team is not None:
         # Add new team roles if they're being added to a team
-        role = await create_team_on_discord(team, guild)
+        role = await create_team_on_discord(payload.team, guild)
         await member.add_roles(role)
 
     return web.Response(status=200)
@@ -138,7 +142,7 @@ async def callback(request: web.Request):
 
 @bot.command()
 async def ping(ctx: commands.Context, *, _: str = None):
-    return await ctx.send(f'Pong! `{bot.latency}`')
+    await ctx.send(f'Pong! `{bot.latency}`')
 
 
 @bot.command()
@@ -169,33 +173,32 @@ async def check(ctx: commands.Context):
                 await member.add_roles(
                     role
                 )
-                await ctx.send(f"Fixed team roles for {member.display_name} - now on {account.team.name}")
+                await ctx.send(
+                    f'Fixed team roles for {member.display_name} - now on '
+                    f'{account.team.name}.'
+                )
         await ctx.send('Done')
 
 
 @bot.command()
 @commands.is_owner()
 async def restart(ctx: commands.Context, *, _: str = None):
-    await ctx.send(f'Shutting down server & Polympics client...')
+    await ctx.send('Shutting down server & Polympics client...')
     await server.shutdown()
     await server.cleanup()
     await polympics_client.close()
-    await ctx.send(f'Complete. Shutting down bot.')
+    await ctx.send('Complete. Shutting down bot.')
     sys.exit(0)
 
 
 @bot.event
 async def on_user_update(before: discord.User, after: discord.User):
     if (account := await polympics_client.get_account(before.id)) is not None:
-
-        if before.avatar != after.avatar:
-            ext = 'gif' if after.is_avatar_animated() else 'png'
-            avatar_url = f'https://cdn.discordapp.com/avatars/{account.id}/{after.avatar}.{ext}'
-        else:
-            avatar_url = account.avatar_url
-
         await polympics_client.update_account(
-            account, name=after.name, discriminator=after.discriminator, avatar_url=avatar_url
+            account,
+            name=after.name,
+            discriminator=after.discriminator,
+            avatar_url=str(after.avatar_url)
         )
 
 
@@ -203,22 +206,17 @@ async def on_user_update(before: discord.User, after: discord.User):
 async def on_member_join(member: discord.Member):
     try:
         account = await polympics_client.get_account(member.id)
-    except Exception:
+    except polympics.PolympicsError:
         return
-    else:
-        if account is None:
-            return
 
-    if account.team is not None:
-        guild = bot.get_guild(814317488418193478)
+    if account and account.team is not None:
+        guild = bot.get_guild(GUILD_ID)
 
         role = await create_team_on_discord(account.team, guild)
         await member.remove_roles(
-            *filter(lambda x: x.name.startswith('Team:'), guild.roles)
+            *filter(lambda x: x.name.startswith('Team:'), member.roles)
         )
-        await member.add_roles(
-            role
-        )
+        await member.add_roles(role)
 
 
 @bot.event
@@ -230,11 +228,9 @@ async def on_ready():
     )
 
     # Add the routes for the server
-    server.add_routes(
-        [
-            web.post("/callback/account_team_update", callback),
-        ],
-    )
+    server.add_routes([
+        web.post('/callback/account_team_update', callback),
+    ])
 
     # logging.basicConfig(level=logging.DEBUG)
 
@@ -249,6 +245,9 @@ async def on_ready():
 
 
 if __name__ == '__main__':
-    DATA = json.loads(DATA_PATH.read_bytes())
+    try:
+        DATA = json.loads(DATA_PATH.read_bytes())
+    except FileNotFoundError:
+        pass
 
     bot.run(config.discord_token)
