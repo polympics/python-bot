@@ -122,6 +122,7 @@ async def callback(request: web.Request):
     member: discord.Member = guild.get_member(account.id)
     if member is None:
         # If not, return
+        print('Member not found')
         return
     
     # Remove any current team roles
