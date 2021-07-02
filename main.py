@@ -2,12 +2,13 @@
 # Copyright (c) 2021 Jasper Harrison. This file is licensed under the terms of the MIT License. #
 # Please see the LICENSE file in the root of this repository for more details.                  #
 # --------------------------------------------------------------------------------------------- #
+from asyncio import Lock
+
 import discord
 import json
 import pathlib
 import polympics
 import sys
-from asyncio import Lock
 from aiohttp import web
 from discord.ext import commands
 
@@ -19,11 +20,10 @@ bot = commands.Bot(
 bot.check(
     commands.guild_only()
 )
-bot.check(
-    commands.check_any(
-        commands.has_any_role(('Staff', 'Mod', 'Polympic Committee', 'Infrastructure')),
-        commands.is_owner(),
-    )
+
+default_check = commands.check_any(
+    commands.has_any_role(('Staff', 'Mod', 'Polympic Committee', 'Infrastructure')),
+    commands.is_owner(),
 )
 
 DATA_PATH = pathlib.Path(__file__).parent.joinpath("data.json")
@@ -53,13 +53,14 @@ def strip_special(text):
     return text.encode('ascii', 'ignore').decode('ascii').strip()
 
 
-async def create_team_on_discord(team: polympics.Team, guild: discord.Guild) -> (discord.Role, discord.TextChannel):
+async def create_team_on_discord(team: polympics.Team, guild: discord.Guild) -> discord.Role:
     """
     Create team role & Team Channel in Discord server if they don't exist already,
     return the discord Objects - role, channel
     """
     
     team_category: discord.CategoryChannel = discord.utils.get(guild.categories, id=846777453640024076)
+    team_category_2: discord.CategoryChannel = discord.utils.get(guild.categories, id=859349825774682112)
     
     # Strip non-ascii characters
     no_emoji_name = strip_special(team.name)
@@ -77,8 +78,10 @@ async def create_team_on_discord(team: polympics.Team, guild: discord.Guild) -> 
         await c.set_permissions(
             role, overwrite=discord.PermissionOverwrite(read_messages=True)
         )
-
-        channel = await team_category.create_text_channel(
+        
+        cat = team_category if len(team_category.channels) < 50 else team_category_2
+        
+        channel = await cat.create_text_channel(
             chan_name, reason='Create Team channel because it didn\'t exist',
             overwrites={
                 role: discord.PermissionOverwrite(read_messages=True),
@@ -138,18 +141,57 @@ async def callback(request: web.Request):
 
 
 @bot.command()
+@default_check
 async def ping(ctx: commands.Context, *, _: str = None):
     return await ctx.send(f'Pong! `{bot.latency}`')
 
 
 @bot.command()
+async def reload(ctx: commands.Context, *, member: str = None):
+    async with ctx.typing():
+        if member is None:
+            member: discord.Member = ctx.author
+        elif discord.utils.get(ctx.author.roles, name='Staff') is not None:
+            try:
+                member: discord.Member = await commands.MemberConverter().convert(ctx, member)
+            except Exception as e:
+                print(f'Unable to find user {member}. Error: {e}')
+                return await ctx.send(
+                    f'Unable to find user **{discord.utils.escape_markdown(member)}**. Try a mention or a user ID.',
+                    allowed_mentions=discord.AllowedMentions.none()
+                )
+        else:
+            return await ctx.send('Only staff members have permission to use this command on another user.')
+        
+        try:
+            account = await polympics_client.get_account(member.id)
+        except Exception as e:
+            print(e)
+            account = None
+        
+        if account is None:
+            return await ctx.send(f'{member.display_name} is not signed up to the Polympics.')
+    
+        await member.remove_roles(
+            *(set(filter(lambda x: x.name.startswith('Team:'), ctx.guild.roles)) & set(member.roles))
+        )
+        if (team := account.team) is not None:
+            role = await create_team_on_discord(team, ctx.guild)
+            await member.add_roles(
+                role
+            )
+            await ctx.send(f'Synced team roles for {member.display_name} to {team.name}')
+        else:
+            await ctx.send(f'**{member.display_name}** has no team.')
+
+
+@bot.command()
 @commands.is_owner()
 async def check(ctx: commands.Context):
-    
     guild: discord.Guild = ctx.guild
     
     async with ctx.typing():
-    
+        
         async for member in guild.fetch_members(limit=None):
             member: discord.Member
             try:
@@ -201,7 +243,7 @@ async def on_user_update(before: discord.User, after: discord.User):
             )
     except Exception as e:
         print(e)
-        
+
 
 @bot.event
 async def on_member_join(member: discord.Member):
