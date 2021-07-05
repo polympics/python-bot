@@ -19,16 +19,18 @@ import config
 
 ADMIN_ROLES = 'Staff', 'Mod', 'Polympic Committee', 'Infrastructure'
 TEAM_CATEGORY_ID = 846777453640024076
+TEAM_CATEGORY_2_ID = 859349825774682112
 TEAM_SPIRIT_ID = 846777537799651388
 MUTED_ROLE_ID = 856036892801630228
 GUILD_ID = 814317488418193478
 
 bot = commands.Bot('p!', intents=discord.Intents.all())
 bot.check(commands.guild_only())
-bot.check(commands.check_any(
+
+default_check = commands.check_any(
     commands.has_any_role(ADMIN_ROLES),
-    commands.is_owner()
-))
+    commands.is_owner(),
+)
 
 DATA_PATH = pathlib.Path(__file__).parent / 'data.json'
 DATA_LOCK = Lock()
@@ -66,6 +68,9 @@ async def create_team_on_discord(
     team_category: discord.CategoryChannel = guild.get_channel(
         TEAM_CATEGORY_ID
     )
+    team_category_2: discord.CategoryChannel = guild.get_channel(
+        TEAM_CATEGORY_2_ID
+    )
 
     # Strip non-ascii characters
     no_emoji_name = strip_special(team.name)
@@ -83,7 +88,12 @@ async def create_team_on_discord(
             role, overwrite=discord.PermissionOverwrite(read_messages=True)
         )
 
-        channel = await team_category.create_text_channel(
+        cat = (
+            team_category if len(team_category.channels) < 50
+            else team_category_2
+        )
+
+        channel = await cat.create_text_channel(
             chan_name, reason='Create Team channel because it didn\'t exist',
             overwrites={
                 role: discord.PermissionOverwrite(read_messages=True),
@@ -126,11 +136,12 @@ async def callback(request: web.Request) -> Optional[web.Response]:
     member: discord.Member = guild.get_member(payload.account.id)
     if member is None:
         # If not, return
+        print('Member not found')
         return
 
     # Remove any current team roles
     await member.remove_roles(
-        *filter(lambda x: x.name.startswith('Team:'), guild.roles)
+        *filter(lambda x: x.name.startswith('Team:'), member.roles)
     )
     if payload.team is not None:
         # Add new team roles if they're being added to a team
@@ -141,14 +152,63 @@ async def callback(request: web.Request) -> Optional[web.Response]:
 
 
 @bot.command()
+@default_check
 async def ping(ctx: commands.Context, *, _: str = None):
     await ctx.send(f'Pong! `{bot.latency}`')
 
 
 @bot.command()
+async def reload(ctx: commands.Context, *, member: str = None):
+    async with ctx.typing():
+        if member is None:
+            member: discord.Member = ctx.author
+        elif discord.utils.get(ctx.author.roles, name='Staff') is not None:
+            try:
+                member: discord.Member = await commands.MemberConverter(
+                    ).convert(ctx, member)
+            except Exception as e:
+                print(f'Unable to find user {member}. Error: {e}')
+                return await ctx.send(
+                    'Unable to find user '
+                    f'**{discord.utils.escape_markdown(member)}**. Try a '
+                    'mention or a user ID.',
+                    allowed_mentions=discord.AllowedMentions.none()
+                )
+        else:
+            return await ctx.send(
+                'Only staff members have permission to use this command on '
+                'another user.'
+            )
+
+        try:
+            account = await polympics_client.get_account(member.id)
+        except Exception as e:
+            print(e)
+            account = None
+
+        if account is None:
+            return await ctx.send(
+                f'{member.display_name} is not signed up to the Polympics.'
+            )
+
+        await member.remove_roles(
+            filter(lambda x: x.name.startswith('Team:'), member.roles)
+        )
+        if (team := account.team) is not None:
+            role = await create_team_on_discord(team, ctx.guild)
+            await member.add_roles(
+                role
+            )
+            await ctx.send(
+                f'Synced team roles for {member.display_name} to {team.name}'
+            )
+        else:
+            await ctx.send(f'**{member.display_name}** has no team.')
+
+
+@bot.command()
 @commands.is_owner()
 async def check(ctx: commands.Context):
-
     guild: discord.Guild = ctx.guild
 
     async with ctx.typing():
@@ -193,13 +253,17 @@ async def restart(ctx: commands.Context, *, _: str = None):
 
 @bot.event
 async def on_user_update(before: discord.User, after: discord.User):
-    if (account := await polympics_client.get_account(before.id)) is not None:
+    try:
+        # Will error if account not found.
+        account = await polympics_client.get_account(before.id)
         await polympics_client.update_account(
             account,
             name=after.name,
             discriminator=after.discriminator,
             avatar_url=str(after.avatar_url).split('?')[0]
         )
+    except Exception as e:
+        print(e)
 
 
 @bot.event
