@@ -198,7 +198,7 @@ async def on_user_update(before: discord.User, after: discord.User):
             account,
             name=after.name,
             discriminator=after.discriminator,
-            avatar_url=str(after.avatar_url)
+            avatar_url=str(after.avatar_url).split('?')[0]
         )
 
 
