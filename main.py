@@ -206,7 +206,7 @@ async def on_user_update(before: discord.User, after: discord.User):
 async def on_member_join(member: discord.Member):
     try:
         account = await polympics_client.get_account(member.id)
-    except polympics.PolympicsError:
+    except Exception:
         return
 
     if account and account.team is not None:
