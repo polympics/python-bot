@@ -212,7 +212,6 @@ async def check(ctx: commands.Context):
     guild: discord.Guild = ctx.guild
 
     async with ctx.typing():
-
         async for member in guild.fetch_members(limit=None):
             member: discord.Member
             try:
