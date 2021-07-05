@@ -26,7 +26,7 @@ TEAM_SPIRIT_ID = 846777537799651388
 MUTED_ROLE_ID = 856036892801630228
 GUILD_ID = 814317488418193478
 
-bot = commands.Bot('p!', intents=discord.Intents.all())
+bot = commands.Bot('p!!', intents=discord.Intents.all())
 bot.check(commands.guild_only())
 
 default_check = commands.check_any(
@@ -176,9 +176,7 @@ async def export(ctx: commands.Context):
             if role.name.startswith('Event: '):
                 events.append(role.name.removeprefix('Event: '))
         if team:
-            writer.writerow([
-                member.id, str(member.user), team, ';'.join(events)
-            ])
+            writer.writerow([member.id, str(member), team, ';'.join(events)])
             user_count += 1
         else:
             no_team_count += 1
