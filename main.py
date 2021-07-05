@@ -3,6 +3,8 @@
 # of the MIT License. Please see the LICENSE file in the root of this        #
 # repository for more details.                                               #
 # -------------------------------------------------------------------------- #
+import csv
+import io
 import json
 import pathlib
 import sys
@@ -155,6 +157,37 @@ async def callback(request: web.Request) -> Optional[web.Response]:
 @default_check
 async def ping(ctx: commands.Context, *, _: str = None):
     await ctx.send(f'Pong! `{bot.latency}`')
+
+
+@bot.command(brief='Export users as a CSV.')
+@default_check
+async def export(ctx: commands.Context):
+    """Export a CSV containing each user with their team and event roles."""
+    file = io.StringIO()
+    writer = csv.writer(file)
+    writer.writerow(['ID', 'Username', 'Team', 'Events'])
+    user_count = no_team_count = 0
+    async for member in ctx.guild.fetch_members(limit=None):
+        team = None
+        events = []
+        for role in member.roles:
+            if role.name.startswith('Team: '):
+                team = role.name.removeprefix('Team: ')
+            if role.name.startswith('Event: '):
+                events.append(role.name.removeprefix('Event: '))
+        if team:
+            writer.writerow([
+                member.id, str(member.user), team, ';'.join(events)
+            ])
+            user_count += 1
+        else:
+            no_team_count += 1
+    file.seek(0)
+    await ctx.send(
+        f'Exported {user_count} users, skipped {no_team_count} without a '
+        'team role.',
+        file=discord.File(file, filename='polympics_users.csv')
+    )
 
 
 @bot.command()
