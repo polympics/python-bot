@@ -9,7 +9,7 @@ import json
 import pathlib
 import sys
 from asyncio import Lock
-from typing import Any, Optional
+from typing import Any, Optional, Union
 
 import discord
 import polympics
@@ -45,7 +45,7 @@ async def store(key: str, value: Any):
         json.dump(DATA, DATA_PATH.open('w'))
 
 
-async def get(key: str, default: Any = None) -> Any:
+async def get(key: Union[int, str], default: Any = None) -> Any:
     async with DATA_LOCK:
         return DATA.get(key, default)
 
@@ -78,7 +78,7 @@ async def create_team_on_discord(
     no_emoji_name = strip_special(team.name)
     chan_name = no_emoji_name.replace(' ', '-').lower()
 
-    team_data = await get(no_emoji_name, None)
+    team_data = await get(team.id, await get(no_emoji_name, None))
 
     if team_data is None:
         role = await guild.create_role(
@@ -113,7 +113,7 @@ async def create_team_on_discord(
             'channel': channel.id
         }
 
-        await store(no_emoji_name, team_data)
+        await store(team.id, team_data)
 
     else:
         role = guild.get_role(team_data['role'])
@@ -132,7 +132,7 @@ async def callback(request: web.Request) -> Optional[web.Response]:
 
     # Load the data sent via the callback
     data: dict = await request.json()
-    payload: polympics.AccountTeamUpdate = polympics.account_team_update(data)
+    payload: polympics.AccountTeamUpdateEvent = polympics.account_team_update(data)
 
     # Is the member in the server?
     member: discord.Member = guild.get_member(payload.account.id)
