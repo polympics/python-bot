@@ -223,7 +223,7 @@ async def reload(ctx: commands.Context, *, member: str = None):
             )
 
         await member.remove_roles(
-            filter(lambda x: x.name.startswith('Team:'), member.roles)
+            *filter(lambda x: x.name.startswith('Team:'), member.roles)
         )
         if (team := account.team) is not None:
             role = await create_team_on_discord(team, ctx.guild)
