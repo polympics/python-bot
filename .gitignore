@@ -141,3 +141,6 @@ cython_debug/
 .idea/
 config.py
 data.json
+
+# VSCode project settings
+.vscode/
