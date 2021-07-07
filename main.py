@@ -9,7 +9,7 @@ import json
 import pathlib
 import sys
 from asyncio import Lock
-from typing import Any, Optional, Union
+from typing import Any, Optional
 
 import discord
 import polympics
@@ -45,7 +45,7 @@ async def store(key: str, value: Any):
         json.dump(DATA, DATA_PATH.open('w'))
 
 
-async def get(key: Union[int, str], default: Any = None) -> Any:
+async def get(key: str, default: Any = None) -> Any:
     async with DATA_LOCK:
         return DATA.get(key, default)
 
@@ -78,7 +78,7 @@ async def create_team_on_discord(
     no_emoji_name = strip_special(team.name)
     chan_name = no_emoji_name.replace(' ', '-').lower()
 
-    team_data = await get(team.id, await get(no_emoji_name, None))
+    team_data = await get(str(team.id), await get(no_emoji_name, None))
 
     if team_data is None:
         role = await guild.create_role(
@@ -113,7 +113,7 @@ async def create_team_on_discord(
             'channel': channel.id
         }
 
-        await store(team.id, team_data)
+        await store(str(team.id), team_data)
 
     else:
         role = guild.get_role(team_data['role'])
