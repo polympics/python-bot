@@ -26,7 +26,7 @@ TEAM_SPIRIT_ID = 846777537799651388
 MUTED_ROLE_ID = 856036892801630228
 GUILD_ID = 814317488418193478
 
-bot = commands.Bot('p!!', intents=discord.Intents.all())
+bot = commands.Bot('p!', intents=discord.Intents.all())
 bot.check(commands.guild_only())
 
 default_check = commands.check_any(
