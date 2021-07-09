@@ -30,7 +30,7 @@ bot = commands.Bot('p!', intents=discord.Intents.all())
 bot.check(commands.guild_only())
 
 default_check = commands.check_any(
-    commands.has_any_role(ADMIN_ROLES),
+    commands.has_any_role(*ADMIN_ROLES),
     commands.is_owner(),
 )
 
