@@ -165,21 +165,24 @@ async def export(ctx: commands.Context):
     """Export a CSV containing each user with their team and event roles."""
     file = io.StringIO()
     writer = csv.writer(file)
-    writer.writerow(['ID', 'Username', 'Team', 'Events', 'FFA Roles'])
+    writer.writerow(['ID', 'Username', 'Team', 'Events', 'FFA Roles', 'Bullet Brackets'])
     user_count = no_team_count = 0
     async for member in ctx.guild.fetch_members(limit=None):
         team = None
         events = []
         ffa_roles = []
+        bullet_roles = []
         for role in member.roles:
             if role.name.startswith('Team: '):
                 team = role.name.removeprefix('Team: ')
-            if role.name.startswith('Event: '):
+            elif role.name.startswith('Event: '):
                 events.append(role.name.removeprefix('Event: '))
-            if role.name[:5] in ('FFA 1', 'FFA 2', 'FFA 3', 'FFA 4'):
+            elif role.name[:5] in ('FFA 1', 'FFA 2', 'FFA 3', 'FFA 4'):
                 ffa_roles.append(role.name)
+            elif role.name in ('Bullet EU', 'Bullet American'):
+                bullet_roles.append(role.name)
         if team:
-            writer.writerow([member.id, str(member), team, ';'.join(events), ';'.join(ffa_roles)])
+            writer.writerow([member.id, str(member), team, ';'.join(events), ';'.join(ffa_roles), ';'.join(bullet_roles)])
             user_count += 1
         else:
             no_team_count += 1
